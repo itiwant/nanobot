@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 class WorkflowEngine:
     """Parse a JSON workflow definition and execute its steps using sub-agents."""
 
+    _MAX_SUBAGENT_ITERATIONS = 15
+
     def __init__(self, workflow_path: str | Path):
         path = Path(workflow_path)
         with open(path, "r", encoding="utf-8") as f:
@@ -141,7 +143,7 @@ class WorkflowEngine:
             {"role": "user", "content": prompt},
         ]
 
-        max_iterations = 15
+        max_iterations = self._MAX_SUBAGENT_ITERATIONS
         final_result: str | None = None
 
         async def _loop() -> str:

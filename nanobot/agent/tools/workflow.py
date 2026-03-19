@@ -53,9 +53,11 @@ class RunWorkflowTool(Tool):
             "required": ["workflow_name", "input"],
         }
 
-    async def execute(self, workflow_name: str, input: str, **kwargs: Any) -> str:
+    async def execute(self, workflow_name: str, input: str, **kwargs: Any) -> str:  # noqa: A002
         """Load and execute the named workflow."""
         from nanobot.agent.workflow import WorkflowEngine
+
+        workflow_input = input
 
         # Resolve workflow file
         workflow_file = self._workflows_dir / f"{workflow_name}.json"
@@ -73,9 +75,9 @@ class RunWorkflowTool(Tool):
             logger.info(
                 "Starting workflow '{}' with input: {}",
                 engine.name,
-                input[:100],
+                workflow_input[:100],
             )
-            result = await engine.run(input, self._manager)
+            result = await engine.run(workflow_input, self._manager)
             return f"Workflow '{engine.name}' completed.\n\nResult:\n{result}"
         except Exception as e:
             logger.error("Workflow '{}' failed: {}", workflow_name, e)

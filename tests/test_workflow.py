@@ -285,7 +285,7 @@ class TestWorkflowExecution:
 
         mgr.provider.chat_with_retry = fake_chat
 
-        result = await engine.run("test topic", mgr)  # noqa: F841
+        await engine.run("test topic", mgr)
         # Conditional step should be skipped (output is empty string)
         assert engine.context.get("conditional_step.output") == ""
 
@@ -309,7 +309,7 @@ class TestWorkflowExecution:
 
         mgr.provider.chat_with_retry = fake_chat
 
-        result = await engine.run("test topic", mgr)  # noqa: F841
+        await engine.run("test topic", mgr)
         assert call_count["n"] == 2
         assert engine.context["conditional_step.output"] == "checked result"
 
