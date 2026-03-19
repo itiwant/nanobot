@@ -1,0 +1,29 @@
+{
+  "name": "Content Creation Pipeline",
+  "description": "Pipeline to research a topic and write a social media post",
+  "steps": [
+    {
+      "step_id": "research",
+      "agent_role": "Deep Research Specialist",
+      "mode": "chain",
+      "prompt_template": "Research the following topic in detail: {{input_topic}}",
+      "timeout": 120
+    },
+    {
+      "step_id": "draft_writing",
+      "agent_role": "Copywriter",
+      "mode": "chain",
+      "prompt_template": "Based on the following research: {{research.output}}, write a compelling draft post.",
+      "timeout": 120
+    },
+    {
+      "step_id": "fact_check",
+      "agent_role": "Fact Checker",
+      "mode": "conditional",
+      "condition": "contains: 'data'",
+      "prompt_template": "Fact-check the following draft: {{draft_writing.output}}",
+      "error_handling": "continue",
+      "timeout": 120
+    }
+  ]
+}
