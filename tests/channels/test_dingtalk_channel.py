@@ -221,3 +221,38 @@ async def test_download_dingtalk_file(tmp_path, monkeypatch) -> None:
     assert "messageFiles/download" in channel._http.calls[0]["url"]
     assert channel._http.calls[0]["json"]["downloadCode"] == "code123"
     assert channel._http.calls[1]["method"] == "GET"
+
+
+@pytest.mark.asyncio
+async def test_send_splits_long_content_into_multiple_markdown_messages() -> None:
+    """Content exceeding DINGTALK_MAX_MESSAGE_LEN must be split into multiple calls."""
+    import json as _json
+    import time as _time
+    from nanobot.channels.dingtalk import DINGTALK_MAX_MESSAGE_LEN
+    from nanobot.bus.events import OutboundMessage
+
+    config = DingTalkConfig(client_id="app", client_secret="secret", allow_from=["*"])
+    channel = DingTalkChannel(config, MessageBus())
+    # Stub token so _get_access_token returns immediately without HTTP
+    channel._access_token = "tok"
+    channel._token_expiry = _time.time() + 3600
+    channel._http = _FakeHttp()
+
+    long_content = "A" * (DINGTALK_MAX_MESSAGE_LEN + 100)
+
+    await channel.send(
+        OutboundMessage(
+            channel="dingtalk",
+            chat_id="user1",
+            content=long_content,
+            metadata={},
+        )
+    )
+
+    # Must have sent more than one sampleMarkdown request
+    assert len(channel._http.calls) >= 2
+    # Each chunk's text must not exceed the limit
+    for call in channel._http.calls:
+        param = call["json"].get("msgParam", "{}")
+        body = _json.loads(param)
+        assert len(body.get("text", "")) <= DINGTALK_MAX_MESSAGE_LEN

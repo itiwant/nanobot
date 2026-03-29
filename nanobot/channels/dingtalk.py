@@ -17,6 +17,9 @@ from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import Base
+from nanobot.utils.helpers import split_message
+
+DINGTALK_MAX_MESSAGE_LEN = 4096  # DingTalk sampleMarkdown text character limit
 
 try:
     from dingtalk_stream import (
@@ -487,7 +490,8 @@ class DingTalkChannel(BaseChannel):
             return
 
         if msg.content and msg.content.strip():
-            await self._send_markdown_text(token, msg.chat_id, msg.content.strip())
+            for chunk in split_message(msg.content.strip(), DINGTALK_MAX_MESSAGE_LEN):
+                await self._send_markdown_text(token, msg.chat_id, chunk)
 
         for media_ref in msg.media or []:
             ok = await self._send_media_ref(token, msg.chat_id, media_ref)
