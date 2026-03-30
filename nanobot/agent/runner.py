@@ -64,6 +64,9 @@ class AgentRunner:
         error: str | None = None
         stop_reason = "completed"
         tool_events: list[dict[str, str]] = []
+        # Accumulated content parts from finish_reason=="length" continuations.
+        # Used to merge partial responses into a single final assistant message.
+        _length_parts: list[str] = []
 
         for iteration in range(spec.max_iterations):
             context = AgentHookContext(iteration=iteration, messages=messages)
@@ -155,27 +158,37 @@ class AgentRunner:
             # Auto-continue when the model hit its output token limit so the
             # user does not have to send a follow-up message to get the rest.
             if response.finish_reason == "length" and clean:
+                _length_parts.append(clean)
                 await _end_stream(resuming=True)
-                messages.append(build_assistant_message(
+                msg_a = build_assistant_message(
                     clean,
                     reasoning_content=response.reasoning_content,
                     thinking_blocks=response.thinking_blocks,
-                ))
+                )
+                msg_a["_continuation"] = True
+                messages.append(msg_a)
                 messages.append({
                     "role": "user",
                     "content": "Continue your response from where you left off.",
+                    "_continuation": True,
                 })
                 await hook.after_iteration(context)
                 continue
 
             await _end_stream(resuming=False)
 
+            # Merge accumulated length-continuation parts with the final response.
+            if _length_parts:
+                _length_parts.append(clean or "")
+                final_content = "\n\n".join(p for p in _length_parts if p)
+            else:
+                final_content = clean
+
             messages.append(build_assistant_message(
-                clean,
+                final_content,
                 reasoning_content=response.reasoning_content,
                 thinking_blocks=response.thinking_blocks,
             ))
-            final_content = clean
             context.final_content = final_content
             context.stop_reason = stop_reason
             await hook.after_iteration(context)
@@ -184,6 +197,11 @@ class AgentRunner:
             stop_reason = "max_iterations"
             template = spec.max_iterations_message or _DEFAULT_MAX_ITERATIONS_MESSAGE
             final_content = template.format(max_iterations=spec.max_iterations)
+
+        # Strip internal continuation artifacts so they are not persisted
+        # in session history.
+        if _length_parts:
+            messages = [m for m in messages if not m.get("_continuation")]
 
         return AgentRunResult(
             final_content=final_content,

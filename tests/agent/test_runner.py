@@ -286,7 +286,7 @@ async def test_runner_auto_continues_on_finish_reason_length():
         max_iterations=5,
     ))
 
-    assert result.final_content == "Part 2 done."
+    assert result.final_content == "Part 1...\n\nPart 2 done."
     assert result.stop_reason == "completed"
     assert call_count["n"] == 2
     # The second call should include the truncated assistant message and the continue prompt
@@ -296,12 +296,16 @@ async def test_runner_auto_continues_on_finish_reason_length():
         m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
         for m in second_messages
     )
-    # But the internal synthetic "continue" prompt must not be persisted in the returned history.
-    # No user message in result.messages should contain "continue" in its content.
+    # Internal continuation artifacts must not be persisted in the returned history.
     assert not any(
         m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
-        for m in getattr(result, "messages", [])
+        for m in result.messages
     )
+    assert not any(m.get("_continuation") for m in result.messages)
+    # The final assistant message in history should contain the merged content.
+    final_assistant = [m for m in result.messages if m.get("role") == "assistant"]
+    assert final_assistant
+    assert final_assistant[-1]["content"] == "Part 1...\n\nPart 2 done."
 
 
 @pytest.mark.asyncio
@@ -369,7 +373,7 @@ async def test_runner_auto_continue_with_streaming():
         hook=StreamHook(),
     ))
 
-    assert result.final_content == "Part 2"
+    assert result.final_content == "Part 1\n\nPart 2"
     assert endings == [True, False]  # first: resuming after length, second: final
 
 
