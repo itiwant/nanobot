@@ -1399,7 +1399,7 @@ Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Baz
     "mcpServers": {
       "bazi": {
         "command": "npx",
-        "args": ["bazi-mcp"],
+        "args": ["-y", "bazi-mcp"],
         "toolTimeout": 30
       }
     }
