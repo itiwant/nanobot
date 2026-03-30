@@ -1725,7 +1725,9 @@ Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Pin
 }
 ```
 
-**Option B — Stdio transport (using the SMCP plugin):**
+**Option B — Stdio transport (using the PinchTab MCP plugin):**
+
+If you cloned the PinchTab repo (e.g. to `~/pinchtab`), you can use its bundled CLI plugin directly:
 
 ```json
 {
@@ -1733,7 +1735,7 @@ Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Pin
     "mcpServers": {
       "pinchtab": {
         "command": "python3",
-        "args": ["/path/to/pinchtab/plugins/pinchtab/cli.py"],
+        "args": ["~/pinchtab/plugins/pinchtab/cli.py"],
         "toolTimeout": 60
       }
     }
@@ -1742,7 +1744,7 @@ Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Pin
 ```
 
 > [!TIP]
-> Option A is simpler — it connects directly to the PinchTab server you already started. Option B uses the SMCP plugin and does not require a running server. Choose whichever fits your setup.
+> Option A is simpler — it connects directly to the PinchTab server you already started. Option B uses the PinchTab CLI plugin via stdio and does not require a running server. Choose whichever fits your setup.
 
 If PinchTab is protected with a token, pass it in the headers:
 
