@@ -296,6 +296,12 @@ async def test_runner_auto_continues_on_finish_reason_length():
         m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
         for m in second_messages
     )
+    # But the internal synthetic "continue" prompt must not be persisted in the returned history.
+    # No user message in result.messages should contain "continue" in its content.
+    assert not any(
+        m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
+        for m in getattr(result, "messages", [])
+    )
 
 
 @pytest.mark.asyncio
