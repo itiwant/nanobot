@@ -200,8 +200,7 @@ class AgentRunner:
 
         # Strip internal continuation artifacts so they are not persisted
         # in session history.
-        if _length_parts:
-            messages = [m for m in messages if not m.get("_continuation")]
+        messages = [m for m in messages if not m.get("_continuation")]
 
         return AgentRunResult(
             final_content=final_content,
