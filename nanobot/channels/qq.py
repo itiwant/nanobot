@@ -38,6 +38,7 @@ from nanobot.bus.queue import MessageBus
 from nanobot.channels.base import BaseChannel
 from nanobot.config.schema import Base
 from nanobot.security.network import validate_url_target
+from nanobot.utils.helpers import split_message
 
 try:
     from nanobot.config.paths import get_media_dir
@@ -63,6 +64,7 @@ if TYPE_CHECKING:
 # (2=voice, 3=video are restricted; we only use image vs file)
 QQ_FILE_TYPE_IMAGE = 1
 QQ_FILE_TYPE_FILE = 4
+QQ_MAX_MESSAGE_LEN = 4000  # QQ Bot API character limit for text/markdown messages
 
 _IMAGE_EXTS = {
     ".png",
@@ -272,12 +274,13 @@ class QQChannel(BaseChannel):
 
         # 2) Send text
         if msg.content and msg.content.strip():
-            await self._send_text_only(
-                chat_id=msg.chat_id,
-                is_group=is_group,
-                msg_id=msg_id,
-                content=msg.content.strip(),
-            )
+            for chunk in split_message(msg.content.strip(), QQ_MAX_MESSAGE_LEN):
+                await self._send_text_only(
+                    chat_id=msg.chat_id,
+                    is_group=is_group,
+                    msg_id=msg_id,
+                    content=chunk,
+                )
 
     async def _send_text_only(
         self,

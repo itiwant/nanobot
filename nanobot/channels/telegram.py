@@ -498,8 +498,10 @@ class TelegramChannel(BaseChannel):
             if stream_id is not None and buf.stream_id is not None and buf.stream_id != stream_id:
                 return
             self._stop_typing(chat_id)
+            chunks = split_message(buf.text, TELEGRAM_MAX_MESSAGE_LEN)
+            first_chunk = chunks[0]
             try:
-                html = _markdown_to_telegram_html(buf.text)
+                html = _markdown_to_telegram_html(first_chunk)
                 await self._call_with_retry(
                     self._app.bot.edit_message_text,
                     chat_id=int_chat_id, message_id=buf.message_id,
@@ -515,7 +517,7 @@ class TelegramChannel(BaseChannel):
                     await self._call_with_retry(
                         self._app.bot.edit_message_text,
                         chat_id=int_chat_id, message_id=buf.message_id,
-                        text=buf.text,
+                        text=first_chunk,
                     )
                 except Exception as e2:
                     if self._is_not_modified_error(e2):
@@ -524,7 +526,12 @@ class TelegramChannel(BaseChannel):
                         return
                     logger.warning("Final stream edit failed: {}", e2)
                     raise  # Let ChannelManager handle retry
-            self._stream_bufs.pop(chat_id, None)
+            try:
+                for chunk in chunks[1:]:
+                    await self._send_text(int_chat_id, chunk)
+            finally:
+                # Always clear the stream buffer to avoid resending overflow chunks on retry
+                self._stream_bufs.pop(chat_id, None)
             return
 
         buf = self._stream_bufs.get(chat_id)
@@ -539,11 +546,13 @@ class TelegramChannel(BaseChannel):
             return
 
         now = time.monotonic()
+        # Truncate to limit for intermediate streaming display; full text is sent on _stream_end
+        display_text = buf.text[:TELEGRAM_MAX_MESSAGE_LEN]
         if buf.message_id is None:
             try:
                 sent = await self._call_with_retry(
                     self._app.bot.send_message,
-                    chat_id=int_chat_id, text=buf.text,
+                    chat_id=int_chat_id, text=display_text,
                 )
                 buf.message_id = sent.message_id
                 buf.last_edit = now
@@ -555,7 +564,7 @@ class TelegramChannel(BaseChannel):
                 await self._call_with_retry(
                     self._app.bot.edit_message_text,
                     chat_id=int_chat_id, message_id=buf.message_id,
-                    text=buf.text,
+                    text=display_text,
                 )
                 buf.last_edit = now
             except Exception as e:

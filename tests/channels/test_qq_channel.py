@@ -170,3 +170,30 @@ async def test_read_media_bytes_missing_file() -> None:
     data, filename = await channel._read_media_bytes("/nonexistent/path/image.png")
     assert data is None
     assert filename is None
+
+
+@pytest.mark.asyncio
+async def test_send_splits_long_content_into_multiple_messages() -> None:
+    """Content exceeding QQ_MAX_MESSAGE_LEN must be split into multiple API calls."""
+    from nanobot.channels.qq import QQ_MAX_MESSAGE_LEN
+
+    channel = QQChannel(QQConfig(app_id="app", secret="secret", allow_from=["*"]), MessageBus())
+    channel._client = _FakeClient()
+    channel._chat_type_cache["group123"] = "group"
+
+    long_content = "A" * (QQ_MAX_MESSAGE_LEN + 100)
+
+    await channel.send(
+        OutboundMessage(
+            channel="qq",
+            chat_id="group123",
+            content=long_content,
+            metadata={"message_id": "msg1"},
+        )
+    )
+
+    # Must have made more than one API call
+    assert len(channel._client.api.group_calls) >= 2
+    # Each chunk must not exceed the limit
+    for call in channel._client.api.group_calls:
+        assert len(call["content"]) <= QQ_MAX_MESSAGE_LEN

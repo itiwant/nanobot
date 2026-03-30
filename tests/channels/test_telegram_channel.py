@@ -339,7 +339,62 @@ async def test_send_delta_stream_end_raises_and_keeps_buffer_on_failure() -> Non
     with pytest.raises(RuntimeError, match="boom"):
         await channel.send_delta("123", "", {"_stream_end": True})
 
+    # Buffer should be kept on failure so that ChannelManager retries can re-use it
     assert "123" in channel._stream_bufs
+    assert channel._stream_bufs["123"].text == "hello"
+
+
+@pytest.mark.asyncio
+async def test_send_delta_long_message_splits_into_multiple_messages_on_stream_end() -> None:
+    """When stream text exceeds TELEGRAM_MAX_MESSAGE_LEN, it is split into multiple messages."""
+    from nanobot.channels.telegram import TELEGRAM_MAX_MESSAGE_LEN
+
+    channel = TelegramChannel(
+        TelegramConfig(enabled=True, token="123:abc", allow_from=["*"]),
+        MessageBus(),
+    )
+    channel._app = _FakeApp(lambda: None)
+    channel._app.bot.edit_message_text = AsyncMock(return_value=None)
+
+    long_text = "A" * (TELEGRAM_MAX_MESSAGE_LEN + 100)
+    channel._stream_bufs["123"] = _StreamBuf(text=long_text, message_id=7, last_edit=0.0)
+
+    await channel.send_delta("123", "", {"_stream_end": True})
+
+    # First chunk should be sent via edit_message_text
+    assert channel._app.bot.edit_message_text.called
+    # Remaining chunk(s) should be sent via send_message
+    assert len(channel._app.bot.sent_messages) >= 1
+    # Each chunk sent must respect the character limit
+    for msg in channel._app.bot.sent_messages:
+        assert len(msg["text"]) <= TELEGRAM_MAX_MESSAGE_LEN
+    # Buffer should be cleared
+    assert "123" not in channel._stream_bufs
+
+
+@pytest.mark.asyncio
+async def test_send_delta_intermediate_truncates_to_max_len() -> None:
+    """Intermediate streaming edits use truncated text to avoid Message_too_long."""
+    from nanobot.channels.telegram import TELEGRAM_MAX_MESSAGE_LEN
+
+    channel = TelegramChannel(
+        TelegramConfig(enabled=True, token="123:abc", allow_from=["*"]),
+        MessageBus(),
+    )
+    channel._app = _FakeApp(lambda: None)
+    channel._app.bot.edit_message_text = AsyncMock(return_value=None)
+
+    long_text = "B" * (TELEGRAM_MAX_MESSAGE_LEN + 500)
+    # Pre-set buffer with a message_id and old last_edit so interval check passes
+    channel._stream_bufs["123"] = _StreamBuf(text="", message_id=42, last_edit=0.0)
+
+    await channel.send_delta("123", long_text, {})
+
+    assert channel._app.bot.edit_message_text.called
+    edited_text = channel._app.bot.edit_message_text.call_args.kwargs.get("text", "")
+    assert len(edited_text) <= TELEGRAM_MAX_MESSAGE_LEN
+    # Full text must still be buffered for correct _stream_end handling
+    assert channel._stream_bufs["123"].text == long_text
 
 
 @pytest.mark.asyncio
