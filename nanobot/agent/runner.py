@@ -136,9 +136,13 @@ class AgentRunner:
                 continue
 
             clean = hook.finalize_content(context, response.content)
-            if response.finish_reason == "error":
+
+            async def _end_stream(resuming: bool) -> None:
                 if hook.wants_streaming():
-                    await hook.on_stream_end(context, resuming=False)
+                    await hook.on_stream_end(context, resuming=resuming)
+
+            if response.finish_reason == "error":
+                await _end_stream(resuming=False)
                 final_content = clean or spec.error_message or _DEFAULT_ERROR_MESSAGE
                 stop_reason = "error"
                 error = final_content
@@ -151,8 +155,7 @@ class AgentRunner:
             # Auto-continue when the model hit its output token limit so the
             # user does not have to send a follow-up message to get the rest.
             if response.finish_reason == "length" and clean:
-                if hook.wants_streaming():
-                    await hook.on_stream_end(context, resuming=True)
+                await _end_stream(resuming=True)
                 messages.append(build_assistant_message(
                     clean,
                     reasoning_content=response.reasoning_content,
@@ -165,8 +168,7 @@ class AgentRunner:
                 await hook.after_iteration(context)
                 continue
 
-            if hook.wants_streaming():
-                await hook.on_stream_end(context, resuming=False)
+            await _end_stream(resuming=False)
 
             messages.append(build_assistant_message(
                 clean,
