@@ -1798,7 +1798,7 @@ Agent: [calls mcp_pinchtab_snapshot to get clickable element refs]
 
 ##### Step 5 — Register Only Specific Tools (Optional)
 
-If you only need navigation and text extraction, use `enabledTools` to limit registered tools:
+If you only need core browsing capabilities (navigation, page snapshots, text extraction, and element interaction), use `enabledTools` to limit registered tools:
 
 ```json
 {
