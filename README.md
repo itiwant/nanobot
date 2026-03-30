@@ -1727,7 +1727,7 @@ Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Pin
 
 **Option B — Stdio transport (using the PinchTab MCP plugin):**
 
-If you cloned the PinchTab repo (e.g. to `~/pinchtab`), you can use its bundled CLI plugin directly:
+If you cloned the PinchTab repo (e.g. to `/home/youruser/pinchtab`), you can use its bundled CLI plugin directly:
 
 ```json
 {
@@ -1735,13 +1735,15 @@ If you cloned the PinchTab repo (e.g. to `~/pinchtab`), you can use its bundled 
     "mcpServers": {
       "pinchtab": {
         "command": "python3",
-        "args": ["~/pinchtab/plugins/pinchtab/cli.py"],
+        "args": ["/home/youruser/pinchtab/plugins/pinchtab/cli.py"],
         "toolTimeout": 60
       }
     }
   }
 }
 ```
+
+> **Note:** Use a full absolute path in `args` — shell shortcuts like `~` are not expanded because nanobot invokes the command directly without a shell.
 
 > [!TIP]
 > Option A is simpler — it connects directly to the PinchTab server you already started. Option B uses the PinchTab CLI plugin via stdio and does not require a running server. Choose whichever fits your setup.
@@ -1773,12 +1775,11 @@ On startup, nanobot will auto-discover PinchTab's browser tools and register the
 | `mcp_pinchtab_navigate` | Navigate to a URL |
 | `mcp_pinchtab_snapshot` | Get an accessibility snapshot of the page (token-efficient) |
 | `mcp_pinchtab_action` | Perform a single action (click, fill, select, etc.) |
-| `mcp_pinchtab_actions` | Perform multiple actions in sequence |
 | `mcp_pinchtab_text` | Extract page text content |
 | `mcp_pinchtab_screenshot` | Take a screenshot of the page |
 | `mcp_pinchtab_pdf` | Generate a PDF of the page |
 | `mcp_pinchtab_evaluate` | Evaluate JavaScript in the page |
-| `mcp_pinchtab_cookies_get` | Get cookies from the page |
+| `mcp_pinchtab_cookies` | Get cookies from the page |
 | `mcp_pinchtab_tabs` | Manage browser tabs |
 
 Try a conversation:
