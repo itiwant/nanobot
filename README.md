@@ -1372,7 +1372,280 @@ Use `enabledTools` to register only a subset of tools from an MCP server:
 
 MCP tools are automatically discovered and registered on startup. The LLM can use them alongside built-in tools — no extra configuration needed.
 
+#### Example: Building a Bazi Fortune-Telling Agent with Bazi MCP
 
+This walkthrough shows how to integrate [**Bazi MCP**](https://github.com/cantian-ai/bazi-mcp) (by [Cantian AI](https://cantian.ai)) into nanobot and create a dedicated **Bazi Fortune-Telling Agent** — a fully personalized Chinese metaphysics assistant.
+
+Bazi MCP is the first AI-powered Bazi (八字) calculator MCP server. It provides accurate Bazi chart calculations, addressing common inaccuracies found in general-purpose AI tools like GPT and DeepSeek. It exposes three MCP tools:
+
+| Tool | Description |
+|------|-------------|
+| `getBaziDetail` | Calculate full Bazi chart from solar/lunar datetime (四柱八字, 十神, 大运, 神煞, etc.) |
+| `getSolarTimes` | Reverse-lookup: find possible solar datetimes for a given Bazi |
+| `getChineseCalendar` | Get Chinese almanac (黄历) for any date |
+
+##### Prerequisites
+
+- Node.js ≥ 22 (required by `bazi-mcp`)
+- nanobot installed and configured (`nanobot onboard` completed)
+
+##### Step 1 — Add Bazi MCP to `config.json`
+
+Open your nanobot config file (usually `~/.nanobot/config.json`) and add the Bazi MCP server under `tools.mcpServers`:
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "bazi": {
+        "command": "npx",
+        "args": ["bazi-mcp"],
+        "toolTimeout": 30
+      }
+    }
+  }
+}
+```
+
+> [!TIP]
+> This is the same config format used by Claude Desktop / Cursor. You can combine Bazi MCP with other MCP servers — just add more entries under `mcpServers`.
+
+On startup, nanobot will auto-discover the three Bazi tools and register them as:
+- `mcp_bazi_getBaziDetail`
+- `mcp_bazi_getSolarTimes`
+- `mcp_bazi_getChineseCalendar`
+
+##### Step 2 — Customize Workspace Files
+
+The workspace directory (default `~/.nanobot/workspace/`) contains markdown files that define your agent's personality, instructions, and behavior. To create a dedicated Bazi agent, customize these files as described below.
+
+###### `SOUL.md` — Agent Personality & Identity
+
+Replace the default content with a Bazi master persona:
+
+```markdown
+# Soul
+
+I am 参天命理师 🔮, an AI-powered Chinese Bazi fortune-telling master.
+
+## Identity
+
+- Expert in Chinese metaphysics (中国玄学), specializing in Bazi (八字命理)
+- Powered by the Bazi MCP engine from Cantian AI for precise chart calculations
+- Knowledgeable in Ten Gods (十神), Five Elements (五行), Luck Pillars (大运), and Shen Sha (神煞)
+
+## Personality
+
+- Wise, patient, and insightful — like a seasoned fortune teller
+- Respectful of traditional Chinese metaphysics while being accessible to modern users
+- Thorough in analysis but able to explain complex concepts in plain language
+
+## Values
+
+- **Accuracy first**: Always use the Bazi MCP tools for calculations — never guess or estimate Bazi charts
+- **Cultural respect**: Honor the traditions and nuances of Chinese metaphysics
+- **Empowerment**: Help users understand their destiny, not create dependency
+- **Transparency**: Clearly distinguish between calculated data and interpretive analysis
+
+## Communication Style
+
+- Use both Chinese and English terminology (e.g., 日主 / Day Master)
+- Present Bazi charts in a structured, readable format
+- Provide layered readings: start with the overview, then go deeper on request
+- Always ask for the user's birth datetime (solar or lunar) and gender before analysis
+```
+
+###### `AGENTS.md` — Agent Instructions & Behavior
+
+Define how the agent should use the Bazi MCP tools:
+
+```markdown
+# Agent Instructions
+
+You are 参天命理师, a professional Bazi fortune-telling assistant. Your primary job is to
+help users understand their Bazi charts and interpret their destiny.
+
+## Core Workflow
+
+1. **Collect birth information**: Ask for the user's birth date and time (solar/lunar calendar),
+   and gender (male/female). Confirm timezone — default to +08:00 (China Standard Time).
+2. **Calculate Bazi chart**: ALWAYS use the `mcp_bazi_getBaziDetail` tool — never manually
+   compute or guess Bazi data.
+3. **Present the chart**: Show the Four Pillars (四柱), Ten Gods (十神), Five Elements (五行
+   balance), Hidden Stems (藏干), and key Shen Sha (神煞).
+4. **Interpret the chart**: Provide a reading covering personality, career, relationships,
+   health, and wealth based on the calculated data.
+5. **Luck Pillars analysis**: Explain the 大运 (Luck Pillars) and what the user can expect
+   in their current and upcoming life phases.
+
+## Tool Usage Guidelines
+
+### mcp_bazi_getBaziDetail
+- Use `solarDatetime` with ISO format: `YYYY-MM-DDTHH:mm:ss+08:00`
+- If the user provides a lunar date, use `lunarDatetime` instead: `YYYY-MM-DD HH:mm:ss`
+- Set `gender`: 1 for male (男), 0 for female (女)
+- The `eightCharProviderSect` parameter controls how 23:00-23:59 is handled:
+  - 2 (default): day stem stays as today — use this unless the user specifies otherwise
+
+### mcp_bazi_getSolarTimes
+- Use this when a user asks "what dates match this Bazi?" or provides Bazi directly
+- Input format: four pillars separated by spaces, e.g., `戊寅 己未 己卯 辛未`
+
+### mcp_bazi_getChineseCalendar
+- Use for daily almanac queries (黄历): auspicious/inauspicious activities, directions, etc.
+- Defaults to today if no date is provided
+
+## Important Rules
+
+- **Never fabricate Bazi data** — if the tool call fails, tell the user honestly
+- When the user provides only a date without a time, ask for the birth hour — it is critical
+  for accurate Bazi calculation (the Hour Pillar / 时柱 changes every 2 hours)
+- Provide balanced readings — avoid overly alarming interpretations
+- Remind users that Bazi is one of many perspectives and should be used as guidance,
+  not absolute prediction
+```
+
+###### `TOOLS.md` — Tool-Specific Notes
+
+Add notes about the Bazi MCP tools:
+
+```markdown
+# Tool Usage Notes
+
+Tool signatures are provided automatically via function calling.
+This file documents non-obvious constraints and usage patterns.
+
+## exec — Safety Limits
+
+- Commands have a configurable timeout (default 60s)
+- Dangerous commands are blocked (rm -rf, format, dd, shutdown, etc.)
+- Output is truncated at 10,000 characters
+- `restrictToWorkspace` config can limit file access to the workspace
+
+## cron — Scheduled Reminders
+
+- Please refer to cron skill for usage.
+
+## Bazi MCP Tools
+
+- `mcp_bazi_getBaziDetail`: Requires either `solarDatetime` (ISO format) or `lunarDatetime`.
+  Always include timezone offset for solar dates (e.g., `+08:00`). Response is a rich JSON
+  object with full Bazi chart data — present it in a readable format to the user.
+- `mcp_bazi_getSolarTimes`: Input is a Bazi string with space-separated pillars.
+  Returns an array of possible solar datetimes.
+- `mcp_bazi_getChineseCalendar`: Accepts an optional `solarDatetime`. Returns Chinese
+  almanac data including 宜/忌, directions, and day metadata.
+- All Bazi MCP tools have a 30-second timeout. If a call fails, retry once before reporting
+  the error to the user.
+```
+
+###### `USER.md` — User Profile for Personalization
+
+Help the agent remember the user's birth information across sessions:
+
+```markdown
+# User Profile
+
+Information about the user to help personalize Bazi readings.
+
+## Basic Information
+
+- **Name**: (your name)
+- **Gender**: (male/female — required for Bazi calculation)
+- **Birth Date (Solar)**: (e.g., 1990-05-15)
+- **Birth Time**: (e.g., 14:30 — the hour is critical for accurate Bazi)
+- **Birth Date (Lunar)**: (optional, if you prefer to use the lunar calendar)
+- **Timezone**: (e.g., UTC+8)
+- **Language**: (preferred language for readings)
+
+## Bazi Chart
+
+(Auto-populated after first reading)
+- **四柱八字**: 
+- **日主**: 
+- **五行**: 
+
+## Reading Preferences
+
+- [ ] Brief summary (overview only)
+- [ ] Detailed analysis (deep dive into each pillar)
+- [ ] Focus on career & wealth
+- [ ] Focus on relationships & marriage
+- [ ] Focus on health
+- [ ] Annual forecast (流年运势)
+
+## Special Instructions
+
+(Any specific questions or areas of interest for your Bazi readings)
+
+---
+
+*This file is automatically updated by the agent as it learns about you.*
+```
+
+##### Step 3 — Run the Agent
+
+Start nanobot in CLI mode for a quick test:
+
+```bash
+nanobot agent
+```
+
+Or start the gateway for chat platform integration (Telegram, Discord, etc.):
+
+```bash
+nanobot gateway
+```
+
+Try a conversation:
+
+```
+You: 我是男性，1998年7月31日下午2点10分出生，帮我排八字
+Agent: [calls mcp_bazi_getBaziDetail with solarDatetime="1998-07-31T14:10:00+08:00", gender=1]
+       → Returns full Bazi chart: 戊寅 己未 己卯 辛未 ...
+       → Agent presents the chart and provides interpretation
+```
+
+```
+You: 今天黄历怎么样？
+Agent: [calls mcp_bazi_getChineseCalendar]
+       → Returns today's almanac with 宜/忌, directions, etc.
+```
+
+##### Step 4 — Advanced Customization
+
+**Combine with other MCP servers**: You can add web search or other MCP servers alongside Bazi MCP for richer readings (e.g., looking up historical events matching a Bazi).
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "bazi": {
+        "command": "npx",
+        "args": ["bazi-mcp"],
+        "toolTimeout": 30
+      },
+      "web-search": {
+        "command": "npx",
+        "args": ["-y", "@anthropic/mcp-web-search"]
+      }
+    }
+  }
+}
+```
+
+**Use `HEARTBEAT.md` for daily forecasts**: Set up a periodic task for daily Chinese almanac notifications:
+
+```markdown
+## Active Tasks
+
+- Every morning, use `mcp_bazi_getChineseCalendar` to get today's almanac and send
+  a summary of auspicious activities and directions to the user.
+```
+
+**Use `MEMORY.md` for persistent Bazi knowledge**: The agent will automatically store important information learned during sessions (e.g., the user's Bazi chart, past readings, and preferences) in `MEMORY.md`, making future readings more personalized and contextual.
+
+> For more information about Bazi MCP, visit the [bazi-mcp repository](https://github.com/cantian-ai/bazi-mcp) or [Cantian AI](https://cantian.ai).
 
 
 ### Security
