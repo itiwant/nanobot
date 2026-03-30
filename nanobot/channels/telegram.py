@@ -526,9 +526,12 @@ class TelegramChannel(BaseChannel):
                         return
                     logger.warning("Final stream edit failed: {}", e2)
                     raise  # Let ChannelManager handle retry
-            for chunk in chunks[1:]:
-                await self._send_text(int_chat_id, chunk)
-            self._stream_bufs.pop(chat_id, None)
+            try:
+                for chunk in chunks[1:]:
+                    await self._send_text(int_chat_id, chunk)
+            finally:
+                # Always clear the stream buffer to avoid resending overflow chunks on retry
+                self._stream_bufs.pop(chat_id, None)
             return
 
         buf = self._stream_bufs.get(chat_id)
