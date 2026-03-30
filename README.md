@@ -1643,7 +1643,7 @@ Agent: [calls mcp_bazi_getChineseCalendar]
   a summary of auspicious activities and directions to the user.
 ```
 
-**Use `MEMORY.md` for persistent Bazi knowledge**: The agent will automatically store important information learned during sessions (e.g., the user's Bazi chart, past readings, and preferences) in `MEMORY.md`, making future readings more personalized and contextual.
+**Use `memory/MEMORY.md` for persistent Bazi knowledge**: The agent will automatically store important information learned during sessions (e.g., the user's Bazi chart, past readings, and preferences) in `memory/MEMORY.md`, making future readings more personalized and contextual.
 
 > For more information about Bazi MCP, visit the [bazi-mcp repository](https://github.com/cantian-ai/bazi-mcp) or [Cantian AI](https://cantian.ai).
 
