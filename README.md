@@ -1580,7 +1580,7 @@ Information about the user to help personalize Bazi readings.
 
 ---
 
-*This file is automatically updated by the agent as it learns about you.*
+*You (or the agent, when explicitly instructed) can update this file over time so it stays aligned with your current preferences and background.*
 ```
 
 ##### Step 3 — Run the Agent
