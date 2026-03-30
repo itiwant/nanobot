@@ -339,8 +339,9 @@ async def test_send_delta_stream_end_raises_and_keeps_buffer_on_failure() -> Non
     with pytest.raises(RuntimeError, match="boom"):
         await channel.send_delta("123", "", {"_stream_end": True})
 
-    # Buffer should be cleared even on failure to prevent memory leaks
-    assert "123" not in channel._stream_bufs
+    # Buffer should be kept on failure so that ChannelManager retries can re-use it
+    assert "123" in channel._stream_bufs
+    assert channel._stream_bufs["123"].text == "hello"
 
 
 @pytest.mark.asyncio
