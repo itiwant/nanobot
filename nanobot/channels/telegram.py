@@ -508,24 +508,18 @@ class TelegramChannel(BaseChannel):
                     text=html, parse_mode="HTML",
                 )
             except Exception as e:
-                if self._is_not_modified_error(e):
-                    logger.debug("Final stream edit already applied for {}", chat_id)
-                    self._stream_bufs.pop(chat_id, None)
-                    return
-                logger.debug("Final stream edit failed (HTML), trying plain: {}", e)
-                try:
-                    await self._call_with_retry(
-                        self._app.bot.edit_message_text,
-                        chat_id=int_chat_id, message_id=buf.message_id,
-                        text=first_chunk,
-                    )
-                except Exception as e2:
-                    if self._is_not_modified_error(e2):
-                        logger.debug("Final stream plain edit already applied for {}", chat_id)
-                        self._stream_bufs.pop(chat_id, None)
-                        return
-                    logger.warning("Final stream edit failed: {}", e2)
-                    raise  # Let ChannelManager handle retry
+                if not self._is_not_modified_error(e):
+                    logger.debug("Final stream edit failed (HTML), trying plain: {}", e)
+                    try:
+                        await self._call_with_retry(
+                            self._app.bot.edit_message_text,
+                            chat_id=int_chat_id, message_id=buf.message_id,
+                            text=first_chunk,
+                        )
+                    except Exception as e2:
+                        if not self._is_not_modified_error(e2):
+                            logger.warning("Final stream edit failed: {}", e2)
+                            raise  # Let ChannelManager handle retry
             try:
                 for chunk in chunks[1:]:
                     await self._send_text(int_chat_id, chunk)

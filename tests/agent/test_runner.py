@@ -259,6 +259,125 @@ async def test_runner_returns_structured_tool_error():
 
 
 @pytest.mark.asyncio
+async def test_runner_auto_continues_on_finish_reason_length():
+    """When finish_reason is 'length', the runner appends a continue prompt and loops."""
+    from nanobot.agent.runner import AgentRunSpec, AgentRunner
+
+    provider = MagicMock()
+    call_count = {"n": 0}
+    captured_messages: list[list[dict]] = []
+
+    async def chat_with_retry(*, messages, **kwargs):
+        call_count["n"] += 1
+        captured_messages.append(list(messages))
+        if call_count["n"] == 1:
+            return LLMResponse(content="Part 1...", finish_reason="length", usage={})
+        return LLMResponse(content="Part 2 done.", finish_reason="stop", usage={})
+
+    provider.chat_with_retry = chat_with_retry
+    tools = MagicMock()
+    tools.get_definitions.return_value = []
+
+    runner = AgentRunner(provider)
+    result = await runner.run(AgentRunSpec(
+        initial_messages=[{"role": "user", "content": "Tell me a story"}],
+        tools=tools,
+        model="test-model",
+        max_iterations=5,
+    ))
+
+    assert result.final_content == "Part 1...\n\nPart 2 done."
+    assert result.stop_reason == "completed"
+    assert call_count["n"] == 2
+    # The second call should include the truncated assistant message and the continue prompt
+    second_messages = captured_messages[1]
+    assert any(m.get("role") == "assistant" and "Part 1..." in (m.get("content") or "") for m in second_messages)
+    assert any(
+        m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
+        for m in second_messages
+    )
+    # Internal continuation artifacts must not be persisted in the returned history.
+    assert not any(
+        m.get("role") == "user" and "continue" in (m.get("content") or "").lower()
+        for m in result.messages
+    )
+    assert not any(m.get("_continuation") for m in result.messages)
+    # The final assistant message in history should contain the merged content.
+    final_assistant = [m for m in result.messages if m.get("role") == "assistant"]
+    assert final_assistant
+    assert final_assistant[-1]["content"] == "Part 1...\n\nPart 2 done."
+
+
+@pytest.mark.asyncio
+async def test_runner_auto_continue_respects_max_iterations():
+    """Auto-continuation on 'length' still stops at max_iterations."""
+    from nanobot.agent.runner import AgentRunSpec, AgentRunner
+
+    provider = MagicMock()
+    provider.chat_with_retry = AsyncMock(
+        return_value=LLMResponse(content="partial...", finish_reason="length", usage={})
+    )
+    tools = MagicMock()
+    tools.get_definitions.return_value = []
+
+    runner = AgentRunner(provider)
+    result = await runner.run(AgentRunSpec(
+        initial_messages=[{"role": "user", "content": "Tell me everything"}],
+        tools=tools,
+        model="test-model",
+        max_iterations=3,
+    ))
+
+    assert result.stop_reason == "max_iterations"
+    assert provider.chat_with_retry.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_runner_auto_continue_with_streaming():
+    """Auto-continuation on 'length' calls on_stream_end(resuming=True)."""
+    from nanobot.agent.hook import AgentHook, AgentHookContext
+    from nanobot.agent.runner import AgentRunSpec, AgentRunner
+
+    provider = MagicMock()
+    call_count = {"n": 0}
+    endings: list[bool] = []
+
+    async def chat_stream_with_retry(*, on_content_delta, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            await on_content_delta("Part 1")
+            return LLMResponse(content="Part 1", finish_reason="length", usage={})
+        await on_content_delta("Part 2")
+        return LLMResponse(content="Part 2", finish_reason="stop", usage={})
+
+    provider.chat_stream_with_retry = chat_stream_with_retry
+    tools = MagicMock()
+    tools.get_definitions.return_value = []
+
+    class StreamHook(AgentHook):
+        def wants_streaming(self) -> bool:
+            return True
+
+        async def on_stream(self, ctx: AgentHookContext, delta: str) -> None:
+            pass
+
+        async def on_stream_end(self, ctx: AgentHookContext, *, resuming: bool) -> None:
+            endings.append(resuming)
+
+    runner = AgentRunner(provider)
+    result = await runner.run(AgentRunSpec(
+        initial_messages=[],
+        tools=tools,
+        model="test-model",
+        max_iterations=5,
+        hook=StreamHook(),
+    ))
+
+    assert result.final_content == "Part 1\n\nPart 2"
+    assert endings == [True, False]  # first: resuming after length, second: final
+
+
+@pytest.mark.asyncio
 async def test_loop_max_iterations_message_stays_stable(tmp_path):
     loop = _make_loop(tmp_path)
     loop.provider.chat_with_retry = AsyncMock(return_value=LLMResponse(
