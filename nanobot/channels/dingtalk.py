@@ -491,7 +491,12 @@ class DingTalkChannel(BaseChannel):
 
         if msg.content and msg.content.strip():
             for chunk in split_message(msg.content.strip(), DINGTALK_MAX_MESSAGE_LEN):
-                await self._send_markdown_text(token, msg.chat_id, chunk)
+                ok = await self._send_markdown_text(token, msg.chat_id, chunk)
+                if not ok:
+                    logger.error("DingTalk markdown send failed for a chunk; aborting remaining chunks.")
+                    # Raise so ChannelManager (or caller) can trigger a retry instead of silently
+                    # accepting a partial delivery.
+                    raise RuntimeError("DingTalk markdown send failed")
 
         for media_ref in msg.media or []:
             ok = await self._send_media_ref(token, msg.chat_id, media_ref)
