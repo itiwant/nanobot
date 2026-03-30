@@ -170,8 +170,7 @@ class AgentRunner:
                 messages.append({
                     "role": "user",
                     "content": "Continue your response from where you left off.",
-                    # Mark as internal so it can be filtered out before persisting history.
-                    "internal": True,
+                    # Mark as a continuation so it can be filtered out before persisting history.
                     "_continuation": True,
                 })
                 await hook.after_iteration(context)
