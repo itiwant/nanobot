@@ -57,6 +57,19 @@ yt-dlp --write-auto-subs --sub-langs en --skip-download \
   && grep -Ev '^[0-9]+$|^[[:space:]]*$|-->' /tmp/video.en.srt
 ```
 
+## FFmpeg requirement
+
+Several operations (audio extraction, subtitle conversion, video merging) require **FFmpeg**:
+
+```bash
+# Install FFmpeg
+brew install ffmpeg          # macOS
+sudo apt install ffmpeg      # Debian/Ubuntu
+pip install imageio[ffmpeg]  # cross-platform fallback
+```
+
+Without FFmpeg, `--convert-subs srt`, `--merge-output-format mp4`, and `-x --audio-format mp3` will fail. Use `yt-dlp -F URL` + `-f <format_id>` to download a single stream that needs no merging if FFmpeg is unavailable.
+
 ## Download audio (MP3)
 
 ```bash
@@ -91,7 +104,7 @@ yt-dlp --dump-json "ytsearch5:your search query" | python3 -c "
 import json,sys
 for line in sys.stdin:
     d=json.loads(line)
-    print(d['title'], '|', d['webpage_url'], '|', d['duration_string'])
+    print(d.get('title', '?'), '|', d.get('webpage_url', '?'), '|', (d.get('duration_string') or '?'))
 "
 ```
 
