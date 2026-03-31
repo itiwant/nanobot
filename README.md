@@ -1648,6 +1648,181 @@ Agent: [calls mcp_bazi_getChineseCalendar]
 
 > For more information about Bazi MCP, visit the [bazi-mcp repository](https://github.com/cantian-ai/bazi-mcp) or [Cantian AI](https://cantian.ai).
 
+#### Example: Adding a Browser Tool with PinchTab
+
+[PinchTab](https://github.com/pinchtab/pinchtab) is a standalone HTTP server that gives AI agents direct control over Chrome. It provides token-efficient page snapshots (~800 tokens/page instead of 10,000+), accessibility-first element refs, multi-tab and multi-instance management, and persistent browser profiles.
+
+Since PinchTab ships with a built-in MCP server, nanobot can integrate it **with zero code changes** — just add an MCP server entry to your config.
+
+##### Prerequisites
+
+- PinchTab installed (see below)
+- nanobot installed and configured (`nanobot onboard` completed)
+
+##### Step 1 — Install PinchTab
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://pinchtab.com/install.sh | bash
+```
+
+**Homebrew:**
+
+```bash
+brew install pinchtab/tap/pinchtab
+```
+
+**npm:**
+
+```bash
+npm install -g pinchtab
+```
+
+**Docker:**
+
+```bash
+docker run -d \
+  --name pinchtab \
+  -p 127.0.0.1:9867:9867 \
+  -v pinchtab-data:/data \
+  --shm-size=2g \
+  pinchtab/pinchtab
+```
+
+##### Step 2 — Start PinchTab
+
+For daily local use, install as a daemon (recommended):
+
+```bash
+pinchtab daemon install
+pinchtab daemon
+```
+
+Or start directly:
+
+```bash
+pinchtab server
+```
+
+PinchTab will listen at `http://localhost:9867` by default.
+
+##### Step 3 — Add PinchTab MCP to `config.json`
+
+Open your nanobot config file (usually `~/.nanobot/config.json`) and add the PinchTab MCP server under `tools.mcpServers`:
+
+**Option A — HTTP transport (recommended, connects to running PinchTab server):**
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "pinchtab": {
+        "url": "http://localhost:9867/mcp",
+        "toolTimeout": 60
+      }
+    }
+  }
+}
+```
+
+**Option B — Stdio transport (using the PinchTab MCP plugin):**
+
+If you cloned the PinchTab repo (e.g. to `/home/youruser/pinchtab`), you can use its bundled CLI plugin directly:
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "pinchtab": {
+        "command": "python3",
+        "args": ["/home/youruser/pinchtab/plugins/pinchtab/cli.py"],
+        "toolTimeout": 60
+      }
+    }
+  }
+}
+```
+
+> **Note:** Use a full absolute path in `args` — shell shortcuts like `~` are not expanded because nanobot invokes the command directly without a shell.
+
+> [!TIP]
+> Option A is simpler — it connects directly to the PinchTab server you already started. Option B uses the PinchTab CLI plugin via stdio and does not require a running server. Choose whichever fits your setup.
+
+If PinchTab is protected with a token, pass it in the headers:
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "pinchtab": {
+        "url": "http://localhost:9867/mcp",
+        "headers": {
+          "Authorization": "Bearer YOUR_PINCHTAB_TOKEN"
+        },
+        "toolTimeout": 60
+      }
+    }
+  }
+}
+```
+
+##### Step 4 — Use It
+
+On startup, nanobot will auto-discover PinchTab's browser tools and register them with the `mcp_pinchtab_` prefix. Available tools include:
+
+| Tool | Description |
+|------|-------------|
+| `mcp_pinchtab_navigate` | Navigate to a URL |
+| `mcp_pinchtab_snapshot` | Get an accessibility snapshot of the page (token-efficient) |
+| `mcp_pinchtab_action` | Perform a single action (click, fill, select, etc.) |
+| `mcp_pinchtab_text` | Extract page text content |
+| `mcp_pinchtab_screenshot` | Take a screenshot of the page |
+| `mcp_pinchtab_pdf` | Generate a PDF of the page |
+| `mcp_pinchtab_evaluate` | Evaluate JavaScript in the page |
+| `mcp_pinchtab_cookies` | Get cookies from the page |
+| `mcp_pinchtab_tabs` | Manage browser tabs |
+
+Try a conversation:
+
+```
+You: Go to https://news.ycombinator.com and summarize the top 5 stories
+Agent: [calls mcp_pinchtab_navigate with url="https://news.ycombinator.com"]
+       [calls mcp_pinchtab_text to extract content]
+       → Returns the page text, agent summarizes the top stories
+
+You: Click on the first story link
+Agent: [calls mcp_pinchtab_snapshot to get clickable element refs]
+       [calls mcp_pinchtab_action with kind="click", ref="e5"]
+       [calls mcp_pinchtab_text to read the article]
+       → Agent navigates and reads the article content
+```
+
+##### Step 5 — Register Only Specific Tools (Optional)
+
+If you only need core browsing capabilities (navigation, page snapshots, text extraction, and element interaction), use `enabledTools` to limit registered tools:
+
+```json
+{
+  "tools": {
+    "mcpServers": {
+      "pinchtab": {
+        "url": "http://localhost:9867/mcp",
+        "toolTimeout": 60,
+        "enabledTools": ["navigate", "snapshot", "text", "action"]
+      }
+    }
+  }
+}
+```
+
+##### Security Notes
+
+> [!WARNING]
+> PinchTab defaults to a local-first security posture — it binds to `127.0.0.1` and restricts browsing to locally hosted websites only via IDPI (Intelligent Domain Policy Inspector). To allow browsing public websites, you must explicitly configure PinchTab's IDPI allowlist. See [PinchTab security guide](https://github.com/pinchtab/pinchtab/blob/main/docs/guides/security.md) for details.
+
+> For more information about PinchTab, visit the [PinchTab repository](https://github.com/pinchtab/pinchtab) or [pinchtab.com/docs](https://pinchtab.com/docs).
+
 
 ### Security
 
