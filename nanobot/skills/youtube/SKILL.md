@@ -54,7 +54,7 @@ Extract subtitle text only (strip timestamps):
 ```bash
 yt-dlp --write-auto-subs --sub-langs en --skip-download \
   --convert-subs srt -o "/tmp/video.%(ext)s" "URL" \
-  && grep -vE '^([0-9]|-->|$)' /tmp/video.en.srt
+  && grep -Ev '^[0-9]+$|^[[:space:]]*$|-->' /tmp/video.en.srt
 ```
 
 ## Download audio (MP3)
