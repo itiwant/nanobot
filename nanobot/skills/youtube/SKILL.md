@@ -27,7 +27,7 @@ print('Title:', d['title'])
 print('Channel:', d['uploader'])
 print('Duration:', d['duration'], 'sec')
 print('Views:', d.get('view_count'))
-print('Description:', d['description'][:300])
+print('Description:', (d.get('description') or '')[:300])
 "
 ```
 
