@@ -63,9 +63,10 @@ Several operations (audio extraction, subtitle conversion, video merging) requir
 
 ```bash
 # Install FFmpeg
-brew install ffmpeg          # macOS
-sudo apt install ffmpeg      # Debian/Ubuntu
-pip install imageio[ffmpeg]  # cross-platform fallback
+brew install ffmpeg                               # macOS (Homebrew)
+sudo apt install ffmpeg                           # Debian/Ubuntu
+# or download a static build from https://ffmpeg.org/download.html
+# and ensure the `ffmpeg` binary is available on your PATH
 ```
 
 Without FFmpeg, `--convert-subs srt`, `--merge-output-format mp4`, and `-x --audio-format mp3` will fail. Use `yt-dlp -F URL` + `-f <format_id>` to download a single stream that needs no merging if FFmpeg is unavailable.
