@@ -23,3 +23,4 @@ The skill format and metadata structure follow OpenClaw's conventions to maintai
 | `tmux` | Remote-control tmux sessions |
 | `clawhub` | Search and install skills from ClawHub registry |
 | `skill-creator` | Create new skills |
+| `youtube` | Download videos, extract subtitles/transcripts, get metadata, and search YouTube, Bilibili, and 1800+ other video sites using yt-dlp |
